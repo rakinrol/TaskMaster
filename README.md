@@ -48,5 +48,5 @@ https://github.com/rakinrol/TaskMaster
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/yourusername/taskmaster.git
+git clone https://github.com/rakinrol/taskmaster.git
 cd taskmaster
