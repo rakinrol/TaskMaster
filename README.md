@@ -25,6 +25,8 @@ This is a Flask-based web application that runs locally or can be deployed to pl
 🔗 **Access Online:**  
 Coming soon or host locally using the instructions below.
 
+🔗 **GitHub Repository:**
+https://github.com/rakinrol/TaskMaster
 ---
 
 ## 🛠️ Technologies Used
