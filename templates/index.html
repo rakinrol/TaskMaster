@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <meta charset="UTF-8" />
+    <title>TaskMaster - My Task List</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        body:not(.dark-mode) .stopwatch-container,
+        body:not(.dark-mode) .stopwatch-box {
+            background-color: transparent !important;
+            box-shadow: none !important;
+            color: #333;
+        }
+        body.dark-mode .stopwatch-container,
+        body.dark-mode .stopwatch-box {
+            background-color: #1e2a38;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            color: #eee;
+        }
+
+        .feedback-emoji-btn {
+            font-size: 2rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            margin: 0 10px;
+            transition: transform 0.2s;
+        }
+        .feedback-emoji-btn:hover {
+            transform: scale(1.3);
+        }
+        .feedback-list {
+            margin-top: 15px;
+            font-size: 1.5rem;
+        }
+        .feedback-item {
+            display: inline-block;
+            margin-right: 8px;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        .feedback-item:hover {
+            opacity: 1;
+        }
+
+        /* Takvim */
+        .calendar {
+            max-width: 300px;
+            margin: 0 auto 40px;
+            background: #f4eaff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .calendar.dark {
+            background: #1e2a38;
+            color: white;
+        }
+        .calendar h3 {
+            margin-bottom: 10px;
+        }
+        .calendar table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .calendar th, .calendar td {
+            padding: 8px;
+            text-align: center;
+        }
+        .calendar td.today {
+            background: #a56eff;
+            color: white;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Başlık ve Tema Tuşu -->
+    <div class="header">
+        <h1>TaskMaster </h1>
+        <button class="theme-toggle" id="theme-toggle-btn">🌓</button>
+    </div>
+
+    <!-- Motivasyon -->
+    <p class="motivation-text">{{ motivation }}</p>
+
+    <!-- Görev Listesi -->
+    <div class="section light-lilac-paper">
+        <h2>To Do List 💜</h2>
+        <p class="date-text">{{ date }}</p>
+
+        <form method="POST" action="{{ url_for('add_task') }}">
+            <input type="text" name="task" placeholder="Add a new task..." required />
+            <button type="submit">Add</button>
+        </form>
+
+        <ul class="task-list">
+            {% for task in tasks %}
+            <li class="{{ 'done' if task.done }}">
+                <a href="{{ url_for('check_task', task_id=loop.index0) }}">✔</a>
+                {{ task.text }}
+                <span class="task-time">{{ task.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+                <a href="{{ url_for('delete_task', task_id=loop.index0) }}">❌</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Notlar ve Odak -->
+    <div>
+        <div class="section light-lilac-paper" style="margin-bottom: 20px;">
+            <h2>Notes 📝</h2>
+            <textarea placeholder="What's on your mind today?"></textarea>
+        </div>
+        <div class="section light-lilac-paper">
+            <h2>Focus 🎯</h2>
+            <textarea placeholder="What are your focus points for today?"></textarea>
+        </div>
+    </div>
+
+    <!-- Günlük Değerlendirme -->
+    <div class="section light-lilac-paper daily-review">
+        <h2>Daily Review 📅</h2>
+        <p>Take a moment to reflect on your day's accomplishments and plan for tomorrow.</p>
+        <textarea placeholder="Write your daily review here..."></textarea>
+    </div>
+
+    <!-- Geri Bildirim -->
+    <div class="section light-lilac-paper" style="margin-top: 30px;">
+        <h2>End of Day Feedback 📝</h2>
+        <p>How are you feeling today? Choose an emoji and let us know! 👇</p>
+
+        <form method="POST" action="{{ url_for('feedback') }}">
+            <button type="submit" name="emoji" value="😄" class="feedback-emoji-btn" title="Mutlu">😄</button>
+            <button type="submit" name="emoji" value="😐" class="feedback-emoji-btn" title="Orta">😐</button>
+            <button type="submit" name="emoji" value="😞" class="feedback-emoji-btn" title="Üzgün">😞</button>
+        </form>
+
+        {% if feedbacks %}
+        <div class="feedback-list" title="Son 5 Geri Bildirim">
+            {% for fb in feedbacks %}
+                <span class="feedback-item" title="{{ fb.timestamp.strftime('%d %b %Y, %H:%M:%S') }}">{{ fb.emoji }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Takvim -->
+    <div class="calendar" id="calendar-box">
+        <h3 id="calendar-month-year"></h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sun</th><th>Mon</th><th>Tue</th>
+                    <th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
+                </tr>
+            </thead>
+            <tbody id="calendar-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Kronometre -->
+    <div class="stopwatch-wrapper">
+        <div class="stopwatch-container">
+            <h2 class="stopwatch-title">🕒 Stopwatch</h2>
+            <div class="stopwatch-box">
+                <span id="stopwatch-time">00:00:00</span>
+                <div class="stopwatch-controls">
+                    <button onclick="startStopwatch()">▶</button>
+                    <button onclick="pauseStopwatch()">⏸</button>
+                    <button onclick="resetStopwatch()">🔁</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tema Scripti -->
+<script>
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    const body = document.body;
+    const calendar = document.getElementById('calendar-box');
+
+    if (localStorage.getItem('theme') === 'dark') {
+        body.classList.add('dark-mode');
+        toggleBtn.textContent = '🌞';
+        calendar.classList.add('dark');
+    } else {
+        toggleBtn.textContent = '🌙';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        calendar.classList.toggle('dark');
+        if (body.classList.contains('dark-mode')) {
+            localStorage.setItem('theme', 'dark');
+            toggleBtn.textContent = '🌞';
+        } else {
+            localStorage.setItem('theme', 'light');
+            toggleBtn.textContent = '🌙';
+        }
+    });
+</script>
+
+<!-- Kronometre Scripti -->
+<script>
+    let stopwatchInterval;
+    let elapsedTime = 0;
+    let isRunning = false;
+
+    const STORAGE_KEY = 'taskmaster_stopwatch_time';
+    const stopwatchDisplay = document.getElementById("stopwatch-time");
+
+    window.onload = () => {
+        const savedTime = localStorage.getItem(STORAGE_KEY);
+        if (savedTime !== null) {
+            elapsedTime = parseInt(savedTime, 10);
+            updateStopwatch();
+        }
+        generateCalendar();
+    };
+
+    function updateStopwatch() {
+        const hours = Math.floor(elapsedTime / 3600);
+        const minutes = Math.floor((elapsedTime % 3600) / 60);
+        const seconds = elapsedTime % 60;
+        stopwatchDisplay.innerText =
+            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+    }
+
+    function startStopwatch() {
+        if (!isRunning) {
+            isRunning = true;
+            stopwatchInterval = setInterval(() => {
+                elapsedTime++;
+                updateStopwatch();
+                localStorage.setItem(STORAGE_KEY, elapsedTime);
+            }, 1000);
+        }
+    }
+
+    function pauseStopwatch() {
+        clearInterval(stopwatchInterval);
+        isRunning = false;
+    }
+
+    function resetStopwatch() {
+        pauseStopwatch();
+        elapsedTime = 0;
+        updateStopwatch();
+        localStorage.removeItem(STORAGE_KEY);
+    }
+</script>
+
+<!-- Takvim Scripti -->
+<script>
+    function generateCalendar() {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
+
+        document.getElementById("calendar-month-year").innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+        const calendarBody = document.getElementById("calendar-body");
+        calendarBody.innerHTML = "";
+
+        let date = 1;
+        for (let i = 0; i < 6; i++) {
+            const row = document.createElement("tr");
+
+            for (let j = 0; j < 7; j++) {
+                const cell = document.createElement("td");
+                if (i === 0 && j < firstDay) {
+                    cell.innerHTML = "";
+                } else if (date > daysInMonth) {
+                    break;
+                } else {
+                    cell.innerHTML = date;
+                    if (date === today.getDate()) {
+                        cell.classList.add("today");
+                    }
+                    date++;
+                }
+                row.appendChild(cell);
+            }
+            calendarBody.appendChild(row);
+        }
+    }
+</script>
+
+<!-- Scroll Pozisyonu Koruma -->
+<script>
+    const form = document.querySelector('form[action="/add"]');
+    form.addEventListener('submit', () => {
+        sessionStorage.setItem('scrollPos', window.scrollY);
+    });
+
+    window.addEventListener('load', () => {
+        const scrollPos = sessionStorage.getItem('scrollPos');
+        if (scrollPos) {
+            window.scrollTo(0, parseInt(scrollPos));
+            sessionStorage.removeItem('scrollPos');
+        }
+    });
+</script>
+
+<div class="text-center italic text-gray-600 my-4">
+    "{{ motivasyon_sozu }}"
+</div>
+
+</body>
+</html>
